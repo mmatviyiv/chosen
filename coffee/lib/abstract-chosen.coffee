@@ -32,6 +32,8 @@ class AbstractChosen
     @display_selected_options = if @options.display_selected_options? then @options.display_selected_options else true
     @display_disabled_options = if @options.display_disabled_options? then @options.display_disabled_options else true
     @include_group_label_in_selected = @options.include_group_label_in_selected || false
+    @max_shown_results = @options.max_shown_results || Number.POSITIVE_INFINITY
+    @case_sensitive_search = @options.case_sensitive_search || false
 
   set_default_text: ->
     if @form_field.getAttribute("data-placeholder")
@@ -65,11 +67,16 @@ class AbstractChosen
 
   results_option_build: (options) ->
     content = ''
+    shown_results = 0
     for data in @results_data
+      data_content = ''
       if data.group
-        content += this.result_add_group data
+        data_content = this.result_add_group data
       else
-        content += this.result_add_option data
+        data_content = this.result_add_option data
+      if data_content != ''
+        shown_results++
+        content += data_content
 
       # this select logic pins on an awkward flag
       # we can make it better
@@ -78,6 +85,9 @@ class AbstractChosen
           this.choice_build data
         else if data.selected and not @is_multiple
           this.single_set_selected_text(this.choice_label(data))
+
+      if shown_results >= @max_shown_results
+        break
 
     content
 
@@ -193,7 +203,8 @@ class AbstractChosen
 
   get_search_regex: (escaped_search_string) ->
     regex_anchor = if @search_contains then "" else "^"
-    new RegExp(regex_anchor + escaped_search_string, 'i')
+    regex_flag = if @case_sensitive_search then "" else "i"
+    new RegExp(regex_anchor + escaped_search_string, regex_flag)
 
   search_string_match: (search_string, regex) ->
     if regex.test search_string
@@ -236,7 +247,7 @@ class AbstractChosen
       when 27
         this.results_hide() if @results_showing
         return true
-      when 9, 38, 40, 16, 91, 17
+      when 9, 38, 40, 16, 91, 17, 18
         # don't do anything on these keys
       else this.results_search()
 
@@ -273,12 +284,15 @@ class AbstractChosen
   # class methods and variables ============================================================
 
   @browser_is_supported: ->
-    if window.navigator.appName == "Microsoft Internet Explorer"
+    if "Microsoft Internet Explorer" is window.navigator.appName
       return document.documentMode >= 8
-    if /iP(od|hone)/i.test(window.navigator.userAgent)
+    if /iP(od|hone)/i.test(window.navigator.userAgent) or
+       /IEMobile/i.test(window.navigator.userAgent) or
+       /Windows Phone/i.test(window.navigator.userAgent) or
+       /BlackBerry/i.test(window.navigator.userAgent) or
+       /BB10/i.test(window.navigator.userAgent) or
+       /Android.*Mobile/i.test(window.navigator.userAgent)
       return false
-    if /Android/i.test(window.navigator.userAgent)
-      return false if /Mobile/i.test(window.navigator.userAgent)
     return true
 
   @default_multiple_text: "Select Some Options"
